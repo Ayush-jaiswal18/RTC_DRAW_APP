@@ -99,4 +99,12 @@ app.post("/room", middleware, async (req, res) => {
     }
 })
 
-app.listen(3001);
+const PORT = process.env.HTTP_PORT || 3001;
+app.listen(PORT, () => {
+    console.log(`HTTP server running on port ${PORT}`);
+});
+
+app.use((err: any, req: any, res: any, next: any) => {
+    console.error(err);
+    res.status(500).json({ message: 'Internal server error' });
+});
