@@ -8,13 +8,23 @@ export default function Home() {
   const router = useRouter();
 
   return (
-    <div className={styles.page}>
-      <input value={roomId} onChange={(e) => {
+    <div style={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100vh",
+      width: "100vw"
+    }}>
+      <input style={{
+        padding: "10px"
+      }} value={roomId} onChange={(e) => {
         setRoomId(e.target.value);
       }} type="text" placeholder="Room id">
       </input>
 
-      <button onClick={() => {
+      <button style={{
+        padding: "10px"
+      }} onClick={() => {
         router.push(`/room/${roomId}`);
       }}>
         Join Room
