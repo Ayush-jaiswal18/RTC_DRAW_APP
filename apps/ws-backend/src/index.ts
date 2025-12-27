@@ -79,13 +79,24 @@ wss.on("connection", (ws, request) => {
 
       if (isNaN(roomId) || typeof message !== "string") return;
 
-      await prismaClient.chat.create({
-        data: {
-          roomId, // ✅ FIX: Prisma expects Int
-          message,
-          userId,
-        },
-      });
+      try {
+        const room = await prismaClient.room.findUnique({ where: { id: roomId } });
+        if (!room) {
+          console.warn(`Received chat for non-existing room ${roomId}, ignoring`);
+          return;
+        }
+
+        await prismaClient.chat.create({
+          data: {
+            roomId,
+            message,
+            userId,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to save chat message", err);
+        return;
+      }
 
       users.forEach((u) => {
         if (u.rooms.includes(roomId)) { // ✅ FIX: number vs number
