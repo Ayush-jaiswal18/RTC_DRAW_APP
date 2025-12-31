@@ -2,19 +2,12 @@ import { HTTP_BACKEND } from "@/config";
 import axios from "axios";
 
 type Shape =
-  | {
-      type: "rect";
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    }
-  | {
-      type: "circle";
-      centerX: number;
-      centerY: number;
-      radius: number;
-    };
+  | { type: "rect"; x: number; y: number; width: number; height: number }
+  | { type: "circle"; centerX: number; centerY: number; radiusX: number; radiusY: number }
+  | { type: "line"; startX: number; startY: number; endX: number; endY: number }
+  | { type: "arrow"; startX: number; startY: number; endX: number; endY: number }
+  | { type: "diamond"; centerX: number; centerY: number; width: number; height: number }
+  | { type: "pencil"; startX: number; startY: number; endX: number; endY: number };
 
 export async function initDraw(
   canvas: HTMLCanvasElement,
@@ -25,22 +18,18 @@ export async function initDraw(
   if (!ctx) return;
 
   let existingShapes: Shape[] = await getExistingShapes(roomId);
+  let previewShape: Shape | null = null;
 
   socket.onmessage = (event) => {
-    let message: any;
-    try {
-      message = JSON.parse(event.data);
-    } catch {
-      return;
-    }
+    const message = safeParseJSON(event.data);
+    if (!message || message.type !== "chat") return;
 
-    if (message.type === "chat") {
-      const parsed = safeParseJSON(message.message);
-      const shape = parsed?.shape ?? parsed;
-      if (shape && typeof shape === "object") {
-        existingShapes.push(shape as Shape);
-        clearCanvas(existingShapes, canvas, ctx);
-      }
+    const parsed = safeParseJSON(message.message);
+    const shape = parsed?.shape ?? parsed;
+
+    if (shape) {
+      existingShapes.push(shape);
+      clearCanvas(existingShapes, canvas, ctx);
     }
   };
 
@@ -49,86 +38,191 @@ export async function initDraw(
   let clicked = false;
   let startX = 0;
   let startY = 0;
+  let lastX = 0;
+  let lastY = 0;
 
-  // 🔧 FIX: prevent duplicate listeners
   canvas.onmousedown = (e) => {
     clicked = true;
     startX = e.offsetX;
     startY = e.offsetY;
+    lastX = startX;
+    lastY = startY;
   };
 
-  canvas.onmouseup = (e) => {
+  canvas.onmouseup = () => {
     if (!clicked) return;
     clicked = false;
 
-    const width = e.offsetX - startX;
-    const height = e.offsetY - startY;
+    if (previewShape) {
+      existingShapes.push(previewShape);
 
-    const shape: Shape = {
-      type: "rect",
-      x: startX,
-      y: startY,
-      width,
-      height,
-    };
+      socket.send(
+        JSON.stringify({
+          type: "chat",
+          roomId,
+          message: JSON.stringify({ shape: previewShape }),
+        })
+      );
 
-    existingShapes.push(shape);
-
-    socket.send(
-      JSON.stringify({
-        type: "chat",
-        roomId,
-        message: JSON.stringify({ shape }),
-      })
-    );
-
-    clearCanvas(existingShapes, canvas, ctx);
+      previewShape = null;
+      clearCanvas(existingShapes, canvas, ctx);
+    }
   };
 
   canvas.onmousemove = (e) => {
     if (!clicked) return;
 
-    const width = e.offsetX - startX;
-    const height = e.offsetY - startY;
+    const x = e.offsetX;
+    const y = e.offsetY;
+
+    const tool = (window as any).selectedTool;
+
+    if (tool === "eraser") {
+      existingShapes.pop();
+      clearCanvas(existingShapes, canvas, ctx);
+      return;
+    }
+
+    if (tool === "pencil") {
+      const shape: Shape = {
+        type: "pencil",
+        startX: lastX,
+        startY: lastY,
+        endX: x,
+        endY: y,
+      };
+
+      existingShapes.push(shape);
+      socket.send(
+        JSON.stringify({
+          type: "chat",
+          roomId,
+          message: JSON.stringify({ shape }),
+        })
+      );
+
+      lastX = x;
+      lastY = y;
+      clearCanvas(existingShapes, canvas, ctx);
+      return;
+    }
+
+    const width = x - startX;
+    const height = y - startY;
+
+    if (tool === "rect") {
+      previewShape = { type: "rect", x: startX, y: startY, width, height };
+    }
+
+    if (tool === "circle") {
+      previewShape = {
+        type: "circle",
+        centerX: startX + width / 2,
+        centerY: startY + height / 2,
+        radiusX: Math.abs(width) / 2,
+        radiusY: Math.abs(height) / 2,
+      };
+    }
+
+    if (tool === "line" || tool === "arrow") {
+      previewShape = { type: tool, startX, startY, endX: x, endY: y };
+    }
+
+    if (tool === "diamond") {
+      previewShape = {
+        type: "diamond",
+        centerX: startX + width / 2,
+        centerY: startY + height / 2,
+        width: Math.abs(width),
+        height: Math.abs(height),
+      };
+    }
 
     clearCanvas(existingShapes, canvas, ctx);
-    ctx.strokeStyle = "rgba(255, 255, 255)";
-    ctx.strokeRect(startX, startY, width, height);
+    drawShape(ctx, previewShape);
   };
 }
 
+function drawShape(ctx: CanvasRenderingContext2D, shape: Shape | null) {
+  if (!shape) return;
+
+  ctx.beginPath();
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+
+  if (shape.type === "rect") {
+    ctx.rect(shape.x, shape.y, shape.width, shape.height);
+  }
+
+  if (shape.type === "circle") {
+    ctx.ellipse(
+      shape.centerX,
+      shape.centerY,
+      shape.radiusX,
+      shape.radiusY,
+      0,
+      0,
+      Math.PI * 2
+    );
+  }
+
+  if (shape.type === "line") {
+    ctx.moveTo(shape.startX, shape.startY);
+    ctx.lineTo(shape.endX, shape.endY);
+  }
+
+  if (shape.type === "arrow") {
+    const { startX, startY, endX, endY } = shape;
+    const headLength = 10;
+    const angle = Math.atan2(endY - startY, endX - startX);
+
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+
+    ctx.lineTo(
+      endX - headLength * Math.cos(angle - Math.PI / 6),
+      endY - headLength * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(
+      endX - headLength * Math.cos(angle + Math.PI / 6),
+      endY - headLength * Math.sin(angle + Math.PI / 6)
+    );
+  }
+
+  if (shape.type === "diamond") {
+    ctx.moveTo(shape.centerX, shape.centerY - shape.height / 2);
+    ctx.lineTo(shape.centerX + shape.width / 2, shape.centerY);
+    ctx.lineTo(shape.centerX, shape.centerY + shape.height / 2);
+    ctx.lineTo(shape.centerX - shape.width / 2, shape.centerY);
+    ctx.closePath();
+  }
+
+  if (shape.type === "pencil") {
+    ctx.moveTo(shape.startX, shape.startY);
+    ctx.lineTo(shape.endX, shape.endY);
+  }
+
+  ctx.stroke();
+}
+
 function clearCanvas(
-  existingShapes: Shape[],
+  shapes: Shape[],
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D
 ) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "rgba(0, 0, 0)";
+  ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  existingShapes.forEach((shape) => {
-    if (shape.type === "rect") {
-      ctx.strokeStyle = "rgba(255, 255, 255)";
-      ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
-    }
-  });
+  shapes.forEach((s) => drawShape(ctx, s));
 }
 
 async function getExistingShapes(roomId: string) {
   const res = await axios.get(`${HTTP_BACKEND}/chats/${roomId}`);
-  const messages = res.data.messages;
-
-  const shapes: Shape[] = [];
-
-  messages.forEach((x: { message: string }) => {
-    const parsed = safeParseJSON(x.message);
-    const shape = parsed?.shape ?? parsed;
-    if (shape && typeof shape === "object") {
-      shapes.push(shape as Shape);
-    }
-  });
-
-  return shapes;
+  return res.data.messages
+    .map((m: any) => safeParseJSON(m.message)?.shape)
+    .filter(Boolean);
 }
 
 function safeParseJSON(s: string) {

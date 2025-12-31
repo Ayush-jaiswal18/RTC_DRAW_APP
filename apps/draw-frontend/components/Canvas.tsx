@@ -1,26 +1,67 @@
-import { initDraw } from "@/draw";
-import { useEffect, useRef } from "react";
+"use client";
 
+import { initDraw } from "@/draw";
+import { useEffect, useRef, useState } from "react";
+import { IconButton } from "./IconButton";
+import {
+  Circle,
+  Pencil,
+  RectangleHorizontalIcon,
+  Hand,
+  MousePointer2,
+  Lock,
+  Type,
+  Image as ImageIcon,
+  Eraser,
+  Minus,
+  ArrowRight,
+  Diamond,
+} from "lucide-react";
+import Topbar from "./Topbar";
+
+export type Tool =
+  | "lock"
+  | "hand"
+  | "select"
+  | "rect"
+  | "diamond"
+  | "circle"
+  | "arrow"
+  | "line"
+  | "pencil"
+  | "text"
+  | "image"
+  | "eraser";
 
 export function Canvass({
-    roomId,
-    socket
+  roomId,
+  socket,
 }: {
-    socket: WebSocket;
-    roomId: string;
+  socket: WebSocket;
+  roomId: string;
 }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [selectedTool, setSelectedTool] = useState<Tool>("pencil");
 
-    const canvasRef = useRef<HTMLCanvasElement>(null)
+  // expose tool to draw logic (unchanged)
+  useEffect(() => {
+    // @ts-ignore
+    window.selectedTool = selectedTool;
+  }, [selectedTool]);
 
-    useEffect(() => {
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    initDraw(canvasRef.current, roomId, socket);
+  }, [roomId, socket]);
 
-        if (canvasRef.current) {
-            initDraw(canvasRef.current, roomId, socket);
-        }
-
-    }, [canvasRef])
-
-    return <div>
-        <canvas ref={canvasRef} width={2000} height={1000}></canvas>
+  return (
+    <div className="h-screen overflow-hidden">
+      <canvas
+        ref={canvasRef}
+        width={window.innerWidth}
+        height={window.innerHeight}
+      />
+      <Topbar selectedTool={selectedTool} setSelectedTool={setSelectedTool} />
     </div>
+  );
 }
