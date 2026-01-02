@@ -1,13 +1,15 @@
 import { HTTP_BACKEND } from "@/config";
+import { updateCursor } from "./cursor";
 import axios from "axios";
+import { eraseAtPoint } from "./eraser";
 
-type Shape =
+export type Shape =
   | { type: "rect"; x: number; y: number; width: number; height: number }
   | { type: "circle"; centerX: number; centerY: number; radiusX: number; radiusY: number }
   | { type: "line"; startX: number; startY: number; endX: number; endY: number }
   | { type: "arrow"; startX: number; startY: number; endX: number; endY: number }
   | { type: "diamond"; centerX: number; centerY: number; width: number; height: number }
-  | { type: "pencil"; points: { x: number; y: number }[] }; // ✅ CHANGED
+  | { type: "pencil"; points: { x: number; y: number }[] };
 
 export async function initDraw(
   canvas: HTMLCanvasElement,
@@ -20,6 +22,28 @@ export async function initDraw(
   let existingShapes: Shape[] = await getExistingShapes(roomId);
   let previewShape: Shape | null = null;
 
+  let undoStack: Shape[][] = [];
+  let redoStack: Shape[][] = [];
+
+  const saveState = () => {
+    undoStack.push(JSON.parse(JSON.stringify(existingShapes)));
+    redoStack = [];
+  };
+
+  (window as any).undo = () => {
+    if (!undoStack.length) return;
+    redoStack.push(JSON.parse(JSON.stringify(existingShapes)));
+    existingShapes = undoStack.pop()!;
+    clearCanvas(existingShapes, canvas, ctx);
+  };
+
+  (window as any).redo = () => {
+    if (!redoStack.length) return;
+    undoStack.push(JSON.parse(JSON.stringify(existingShapes)));
+    existingShapes = redoStack.pop()!;
+    clearCanvas(existingShapes, canvas, ctx);
+  };
+
   socket.onmessage = (event) => {
     const message = safeParseJSON(event.data);
     if (!message || message.type !== "chat") return;
@@ -28,6 +52,7 @@ export async function initDraw(
     const shape = parsed?.shape ?? parsed;
 
     if (shape) {
+      saveState();
       existingShapes.push(shape);
       clearCanvas(existingShapes, canvas, ctx);
     }
@@ -38,16 +63,17 @@ export async function initDraw(
   let clicked = false;
   let startX = 0;
   let startY = 0;
-
-  let pencilPoints: { x: number; y: number }[] = []; // ✅ ADDED
+  let pencilPoints: { x: number; y: number }[] = [];
 
   canvas.onmousedown = (e) => {
     clicked = true;
+    saveState();
+
     startX = e.offsetX;
     startY = e.offsetY;
 
     if ((window as any).selectedTool === "pencil") {
-      pencilPoints = [{ x: startX, y: startY }]; // ✅ ADDED
+      pencilPoints = [{ x: startX, y: startY }];
     }
   };
 
@@ -67,26 +93,28 @@ export async function initDraw(
       );
 
       previewShape = null;
-      pencilPoints = []; // ✅ RESET
+      pencilPoints = [];
       clearCanvas(existingShapes, canvas, ctx);
     }
   };
 
   canvas.onmousemove = (e) => {
+    const tool = (window as any).selectedTool;
+    updateCursor(canvas, tool);
+
     if (!clicked) return;
 
     const x = e.offsetX;
     const y = e.offsetY;
-    const tool = (window as any).selectedTool;
 
     if (tool === "eraser") {
-      existingShapes.pop();
+      existingShapes = eraseAtPoint(x, y, existingShapes);
       clearCanvas(existingShapes, canvas, ctx);
       return;
     }
 
     if (tool === "pencil") {
-      pencilPoints.push({ x, y }); // ✅ CHANGED
+      pencilPoints.push({ x, y });
 
       previewShape = {
         type: "pencil",
@@ -192,7 +220,7 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Shape | null) {
 
   if (shape.type === "pencil") {
     ctx.moveTo(shape.points[0].x, shape.points[0].y);
-    shape.points.forEach((p) => ctx.lineTo(p.x, p.y)); // ✅ CHANGED
+    shape.points.forEach((p) => ctx.lineTo(p.x, p.y));
   }
 
   ctx.stroke();

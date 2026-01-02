@@ -7,7 +7,7 @@ export function IconButton({
 }: {
   icon: ReactNode;
   onClick: () => void;
-  activated: boolean;
+  activated?: boolean;
 }) {
   return (
     <button
