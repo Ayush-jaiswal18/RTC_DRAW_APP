@@ -7,7 +7,7 @@ type Shape =
   | { type: "line"; startX: number; startY: number; endX: number; endY: number }
   | { type: "arrow"; startX: number; startY: number; endX: number; endY: number }
   | { type: "diamond"; centerX: number; centerY: number; width: number; height: number }
-  | { type: "pencil"; startX: number; startY: number; endX: number; endY: number };
+  | { type: "pencil"; points: { x: number; y: number }[] }; // ✅ CHANGED
 
 export async function initDraw(
   canvas: HTMLCanvasElement,
@@ -38,15 +38,17 @@ export async function initDraw(
   let clicked = false;
   let startX = 0;
   let startY = 0;
-  let lastX = 0;
-  let lastY = 0;
+
+  let pencilPoints: { x: number; y: number }[] = []; // ✅ ADDED
 
   canvas.onmousedown = (e) => {
     clicked = true;
     startX = e.offsetX;
     startY = e.offsetY;
-    lastX = startX;
-    lastY = startY;
+
+    if ((window as any).selectedTool === "pencil") {
+      pencilPoints = [{ x: startX, y: startY }]; // ✅ ADDED
+    }
   };
 
   canvas.onmouseup = () => {
@@ -65,6 +67,7 @@ export async function initDraw(
       );
 
       previewShape = null;
+      pencilPoints = []; // ✅ RESET
       clearCanvas(existingShapes, canvas, ctx);
     }
   };
@@ -74,7 +77,6 @@ export async function initDraw(
 
     const x = e.offsetX;
     const y = e.offsetY;
-
     const tool = (window as any).selectedTool;
 
     if (tool === "eraser") {
@@ -84,26 +86,15 @@ export async function initDraw(
     }
 
     if (tool === "pencil") {
-      const shape: Shape = {
+      pencilPoints.push({ x, y }); // ✅ CHANGED
+
+      previewShape = {
         type: "pencil",
-        startX: lastX,
-        startY: lastY,
-        endX: x,
-        endY: y,
+        points: pencilPoints,
       };
 
-      existingShapes.push(shape);
-      socket.send(
-        JSON.stringify({
-          type: "chat",
-          roomId,
-          message: JSON.stringify({ shape }),
-        })
-      );
-
-      lastX = x;
-      lastY = y;
       clearCanvas(existingShapes, canvas, ctx);
+      drawShape(ctx, previewShape);
       return;
     }
 
@@ -200,8 +191,8 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: Shape | null) {
   }
 
   if (shape.type === "pencil") {
-    ctx.moveTo(shape.startX, shape.startY);
-    ctx.lineTo(shape.endX, shape.endY);
+    ctx.moveTo(shape.points[0].x, shape.points[0].y);
+    shape.points.forEach((p) => ctx.lineTo(p.x, p.y)); // ✅ CHANGED
   }
 
   ctx.stroke();
