@@ -15,12 +15,12 @@ function App() {
               <span className="text-primary block">Made Simple</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-              Create, collaborate, and share beautiful diagrams and sketches with our intuitive drawing tool. 
+              Create, collaborate, and share beautiful diagrams and sketches with our intuitive drawing tool.
               No sign-up required.
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link href={"/signin"}>
-                <Button variant={"primary"} size="lg" className="h-12 px-6">
+                <Button variant={"primary"} size="lg" className="h-12 px-6 flex">
                   Sign in
                   <Pencil className="ml-2 h-4 w-4" />
                 </Button>
@@ -90,7 +90,7 @@ function App() {
                 Join thousands of users who are already creating amazing diagrams and sketches.
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
-                <Button size="lg" variant="secondary" className="h-12 px-6">
+                <Button size="lg" variant="secondary" className="h-12 px-6 flex">
                   Open Canvas
                   <Pencil className="ml-2 h-4 w-4" />
                 </Button>
@@ -104,23 +104,30 @@ function App() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t">
-        <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
+      <footer className="border-t bg-background">
+        <div className="container mx-auto px-4 py-10 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
+
+            {/* Left */}
             <p className="text-sm text-muted-foreground">
-              © 2024 Excalidraw Clone. All rights reserved.
+              © {new Date().getFullYear()} <span className="font-medium">Draw RTC</span>.
+              All rights reserved.
             </p>
-            <div className="flex space-x-6">
-              <a href="https://github.com" className="text-muted-foreground hover:text-primary">
-                <Github className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-primary">
+
+            {/* Right */}
+            <div className="flex items-center gap-6">
+              <a
+                href="/download"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
                 <Download className="h-5 w-5" />
               </a>
             </div>
+
           </div>
         </div>
       </footer>
+
     </div>
   );
 }
