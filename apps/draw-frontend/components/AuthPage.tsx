@@ -3,66 +3,84 @@
 import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+const BACKEND = "http://localhost:3001";
 
 export function AuthPage({ isSignin }: { isSignin: boolean }) {
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
-            <Card className="w-full max-w-md">
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-                {/* Header */}
-                <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">
-                        {isSignin ? "Sign in to Draw RTC" : "Create your Draw RTC account"}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground mt-2">
-                        {isSignin
-                            ? "Welcome back! Please enter your details."
-                            : "Get started with real-time collaborative drawing."}
-                    </p>
-                </CardHeader>
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
 
-                {/* Content */}
-                <CardContent>
-                    <form className="space-y-4">
+    const res = await fetch(`${BACKEND}/${isSignin ? "signin" : "signup"}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: email,
+        password,
+        name: email.split("@")[0],
+      }),
+    });
 
-                        {/* Email */}
-                        <div className="space-y-1">
-                            <label className="text-sm font-medium">Email</label>
-                            <input
-                                type="email"
-                                placeholder="you@example.com"
-                                className="w-full h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
-                            />
-                        </div>
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.message);
+      return;
+    }
 
-                        {/* Password */}
-                        <div className="space-y-1">
-                            <label className="text-sm font-medium">Password</label>
-                            <input
-                                type="password"
-                                placeholder="••••••••"
-                                className="w-full h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
-                            />
-                        </div>
+    router.push("/");
+  }
 
-                        {/* Button */}
-                        <Button className="w-full h-11 mt-2">
-                            {isSignin ? "Sign in" : "Sign up"}
-                        </Button>
-                    </form>
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-muted/40">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">
+            {isSignin ? "Sign in" : "Sign up"}
+          </CardTitle>
+        </CardHeader>
 
-                    {/* Footer text */}
-                    <p className="text-center text-sm text-muted-foreground mt-6">
-                        {isSignin ? "Don’t have an account?" : "Already have an account?"}{" "}
-                        <Link
-                            href={isSignin ? "/signup" : "/signin"}
-                            className="text-primary hover:underline font-medium"
-                        >
-                            {isSignin ? "Sign up" : "Sign in"}
-                        </Link>
-                    </p>
-                </CardContent>
-            </Card>
-        </div>
-    );
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input
+              className="w-full border px-3 py-2 rounded"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+
+            <input
+              type="password"
+              className="w-full border px-3 py-2 rounded"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+
+            <Button className="w-full">
+              {isSignin ? "Sign in" : "Sign up"}
+            </Button>
+          </form>
+
+          <p className="text-sm text-center mt-4">
+            {isSignin ? "No account?" : "Already have an account?"}{" "}
+            <Link
+              href={isSignin ? "/signup" : "/signin"}
+              className="text-primary underline"
+            >
+              {isSignin ? "Sign up" : "Sign in"}
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
