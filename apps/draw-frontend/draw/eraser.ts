@@ -24,13 +24,19 @@ export function eraseAtPoint(
 
         if (current.length > 1) chunks.push(current);
 
+        if (chunks.length === 1 && chunks[0].length === shape.points.length) {
+          return shape; // No change
+        }
+
         return chunks.map((points) => ({
           type: "pencil",
           points,
+          id: Math.random().toString(36).substring(2, 9)
         }));
       }
 
-      if (isPointInsideShape(x, y, shape)) {
+      const isInside = isPointInsideShape(x, y, shape);
+      if (isInside) {
         return null;
       }
 

@@ -4,12 +4,16 @@ import axios from "axios";
 import { eraseAtPoint } from "./eraser";
 
 export type Shape =
-  | { type: "rect"; x: number; y: number; width: number; height: number }
-  | { type: "circle"; centerX: number; centerY: number; radiusX: number; radiusY: number }
-  | { type: "line"; startX: number; startY: number; endX: number; endY: number }
-  | { type: "arrow"; startX: number; startY: number; endX: number; endY: number }
-  | { type: "diamond"; centerX: number; centerY: number; width: number; height: number }
-  | { type: "pencil"; points: { x: number; y: number }[] };
+  | { type: "rect"; x: number; y: number; width: number; height: number; id: string }
+  | { type: "circle"; centerX: number; centerY: number; radiusX: number; radiusY: number; id: string }
+  | { type: "line"; startX: number; startY: number; endX: number; endY: number; id: string }
+  | { type: "arrow"; startX: number; startY: number; endX: number; endY: number; id: string }
+  | { type: "diamond"; centerX: number; centerY: number; width: number; height: number; id: string }
+  | { type: "pencil"; points: { x: number; y: number }[]; id: string };
+
+function generateId() {
+  return Math.random().toString(36).substring(2, 9);
+}
 
 export async function initDraw(
   canvas: HTMLCanvasElement,
@@ -24,30 +28,12 @@ export async function initDraw(
     existingShapes = await getExistingShapes(roomId);
   } catch (e) {
     console.error("Failed to get existing shapes:", e);
-    // fallback to empty shapes so canvas doesn't crash
   }
   let previewShape: Shape | null = null;
-
-  let undoStack: Shape[][] = [];
-  let redoStack: Shape[][] = [];
+  let pencilPoints: { x: number; y: number }[] = [];
 
   const saveState = () => {
-    undoStack.push(JSON.parse(JSON.stringify(existingShapes)));
-    redoStack = [];
-  };
-
-  (window as any).undo = () => {
-    if (!undoStack.length) return;
-    redoStack.push(JSON.parse(JSON.stringify(existingShapes)));
-    existingShapes = undoStack.pop()!;
-    clearCanvas(existingShapes, canvas, ctx);
-  };
-
-  (window as any).redo = () => {
-    if (!redoStack.length) return;
-    undoStack.push(JSON.parse(JSON.stringify(existingShapes)));
-    existingShapes = redoStack.pop()!;
-    clearCanvas(existingShapes, canvas, ctx);
+    // Basic undo (local only for now, complex to sync)
   };
 
   socket.onmessage = (event) => {
@@ -55,12 +41,20 @@ export async function initDraw(
     if (!message || message.type !== "chat") return;
 
     const parsed = safeParseJSON(message.message);
-    const shape = parsed?.shape ?? parsed;
 
-    if (shape) {
-      saveState();
-      existingShapes.push(shape);
+    if (parsed.type === "delete") {
+      existingShapes = existingShapes.filter(s => s.id !== parsed.id);
       clearCanvas(existingShapes, canvas, ctx);
+    } else {
+      const shape = parsed.shape ?? parsed;
+      if (shape && shape.id) {
+        // If we already have this ID (e.g. from local optimistic update), update it or ignore
+        // But for now just push if new
+        if (!existingShapes.find(s => s.id === shape.id)) {
+          existingShapes.push(shape);
+          clearCanvas(existingShapes, canvas, ctx);
+        }
+      }
     }
   };
 
@@ -69,17 +63,19 @@ export async function initDraw(
   let clicked = false;
   let startX = 0;
   let startY = 0;
-  let pencilPoints: { x: number; y: number }[] = [];
 
   canvas.onmousedown = (e) => {
     clicked = true;
-    saveState();
-
     startX = e.offsetX;
     startY = e.offsetY;
 
     if ((window as any).selectedTool === "pencil") {
       pencilPoints = [{ x: startX, y: startY }];
+      previewShape = {
+        type: "pencil",
+        points: pencilPoints,
+        id: generateId()
+      }
     }
   };
 
@@ -114,19 +110,41 @@ export async function initDraw(
     const y = e.offsetY;
 
     if (tool === "eraser") {
-      existingShapes = eraseAtPoint(x, y, existingShapes);
+      const newShapes = eraseAtPoint(x, y, existingShapes);
+
+      // Calculate diff
+      const newIds = new Set(newShapes.map(s => s.id));
+      const oldIds = new Set(existingShapes.map(s => s.id));
+
+      const added = newShapes.filter(s => !oldIds.has(s.id));
+      const removed = existingShapes.filter(s => !newIds.has(s.id));
+
+      // Send updates
+      removed.forEach(s => {
+        socket.send(JSON.stringify({
+          type: "chat",
+          roomId,
+          message: JSON.stringify({ type: "delete", id: s.id })
+        }))
+      });
+
+      added.forEach(s => {
+        socket.send(JSON.stringify({
+          type: "chat",
+          roomId,
+          message: JSON.stringify({ shape: s })
+        }))
+      });
+
+      existingShapes = newShapes;
       clearCanvas(existingShapes, canvas, ctx);
       return;
     }
 
     if (tool === "pencil") {
-      pencilPoints.push({ x, y });
-
-      previewShape = {
-        type: "pencil",
-        points: pencilPoints,
-      };
-
+      if (previewShape && previewShape.type === "pencil") {
+        previewShape.points.push({ x, y });
+      }
       clearCanvas(existingShapes, canvas, ctx);
       drawShape(ctx, previewShape);
       return;
@@ -134,9 +152,12 @@ export async function initDraw(
 
     const width = x - startX;
     const height = y - startY;
+    const id = generateId(); // Temporary ID for preview, but onMouseUp we need to stabilize it.
+    // Actually, we should keep the SAME ID during preview.
+    const currentId = previewShape?.id || generateId();
 
     if (tool === "rect") {
-      previewShape = { type: "rect", x: startX, y: startY, width, height };
+      previewShape = { type: "rect", x: startX, y: startY, width, height, id: currentId };
     }
 
     if (tool === "circle") {
@@ -146,11 +167,12 @@ export async function initDraw(
         centerY: startY + height / 2,
         radiusX: Math.abs(width) / 2,
         radiusY: Math.abs(height) / 2,
+        id: currentId
       };
     }
 
     if (tool === "line" || tool === "arrow") {
-      previewShape = { type: tool, startX, startY, endX: x, endY: y };
+      previewShape = { type: tool, startX, startY, endX: x, endY: y, id: currentId };
     }
 
     if (tool === "diamond") {
@@ -160,6 +182,7 @@ export async function initDraw(
         centerY: startY + height / 2,
         width: Math.abs(width),
         height: Math.abs(height),
+        id: currentId
       };
     }
 
@@ -245,9 +268,29 @@ function clearCanvas(
 
 async function getExistingShapes(roomId: string) {
   const res = await axios.get(`${HTTP_BACKEND}/chats/${roomId}`);
-  return res.data.messages
-    .map((m: any) => safeParseJSON(m.message)?.shape)
-    .filter(Boolean);
+  const messages = res.data.messages;
+
+  const shapes: Shape[] = [];
+
+  messages.forEach((x: any) => {
+    const messageData = safeParseJSON(x.message);
+    if (messageData.type === "delete") {
+      // Remove shape with this ID
+      // Using index since we might have duplicates if ID not unique? Assumed unique.
+      const index = shapes.findIndex(s => s.id === messageData.id);
+      if (index !== -1) {
+        shapes.splice(index, 1);
+      }
+    } else {
+      // It's a shape
+      const shape = messageData.shape || messageData;
+      if (shape && shape.id) {
+        shapes.push(shape);
+      }
+    }
+  });
+
+  return shapes;
 }
 
 function safeParseJSON(s: string) {

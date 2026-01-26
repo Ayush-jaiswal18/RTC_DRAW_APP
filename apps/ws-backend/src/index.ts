@@ -16,7 +16,7 @@ wss.on("error", (error: any) => {
 
 interface User {
   ws: WebSocket;
-  rooms: number[]; // ✅ FIX: use number instead of string
+  rooms: number[]; // 
   userId: string;
 }
 
@@ -99,7 +99,7 @@ wss.on("connection", (ws, request) => {
       }
 
       users.forEach((u) => {
-        if (u.rooms.includes(roomId)) { // ✅ FIX: number vs number
+        if (u.rooms.includes(roomId) && u.ws !== ws) {
           u.ws.send(
             JSON.stringify({
               type: "chat",
