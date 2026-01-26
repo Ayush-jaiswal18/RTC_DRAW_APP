@@ -41,21 +41,26 @@ export function Canvass({
   roomId: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [selectedTool, setSelectedTool] = useState<Tool>("pencil");
+  const [selectedTool, setSelectedTool] = useState<Tool>("circle");
 
-  // expose tool to draw logic (unchanged)
   useEffect(() => {
     // @ts-ignore
     window.selectedTool = selectedTool;
   }, [selectedTool]);
 
+
   useEffect(() => {
-    if (!canvasRef.current) return;
-    initDraw(canvasRef.current, roomId, socket);
-  }, [roomId, socket]);
+    if (canvasRef.current) {
+      console.log("Initializing draw logic for room:", roomId);
+      initDraw(canvasRef.current, roomId, socket);
+    }
+  }, [canvasRef, roomId, socket]);
 
   return (
-    <div className="h-screen overflow-hidden">
+    <div style={{
+      height: "100vh",
+      overflow: "hidden"
+    }}>
       <canvas
         ref={canvasRef}
         width={window.innerWidth}

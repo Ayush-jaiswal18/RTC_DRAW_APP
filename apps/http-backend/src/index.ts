@@ -19,7 +19,7 @@ app.use(cookieParser());
 
 app.use(
     cors({
-        origin: "http://localhost:3000",
+        origin: ["http://localhost:3000"],
         credentials: true,
     })
 );
@@ -84,13 +84,13 @@ app.post("/signin", async (req, res) => {
 });
 
 app.post("/logout", (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: false,
-  });
+    res.clearCookie("token", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+    });
 
-  res.redirect("http://localhost:3000/");
+    res.redirect("http://localhost:3000/");
 });
 
 
@@ -117,6 +117,30 @@ app.post("/room", middleware, async (req, res) => {
         res.status(409).json({
             message: "Room already exists",
         });
+    }
+});
+
+app.get("/chats/:roomId", async (req, res) => {
+    try {
+        const roomId = Number(req.params.roomId);
+        const messages = await prismaClient.chat.findMany({
+            where: {
+                roomId: roomId
+            },
+            orderBy: {
+                id: "desc"
+            },
+            take: 50
+        });
+
+        res.json({
+            messages: messages.reverse()
+        })
+    } catch (e) {
+        console.log(e);
+        res.json({
+            messages: []
+        })
     }
 });
 

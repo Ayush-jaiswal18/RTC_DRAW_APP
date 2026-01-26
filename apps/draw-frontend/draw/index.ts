@@ -19,7 +19,13 @@ export async function initDraw(
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  let existingShapes: Shape[] = await getExistingShapes(roomId);
+  let existingShapes: Shape[] = [];
+  try {
+    existingShapes = await getExistingShapes(roomId);
+  } catch (e) {
+    console.error("Failed to get existing shapes:", e);
+    // fallback to empty shapes so canvas doesn't crash
+  }
   let previewShape: Shape | null = null;
 
   let undoStack: Shape[][] = [];

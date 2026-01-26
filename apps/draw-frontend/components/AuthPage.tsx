@@ -5,10 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { HTTP_BACKEND } from "@/config";
 
-const BACKEND = "http://localhost:3001";
-
-export function AuthPage({ isSignin }: { isSignin: boolean }) {
+export function AuthPage({ isSignin, redirect }: { isSignin: boolean, redirect?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,7 +16,7 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const res = await fetch(`${BACKEND}/${isSignin ? "signin" : "signup"}`, {
+    const res = await fetch(`${HTTP_BACKEND}/${isSignin ? "signin" : "signup"}`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -34,7 +33,7 @@ export function AuthPage({ isSignin }: { isSignin: boolean }) {
       return;
     }
 
-    router.push("/");
+    router.push(redirect || "/");
   }
 
   return (

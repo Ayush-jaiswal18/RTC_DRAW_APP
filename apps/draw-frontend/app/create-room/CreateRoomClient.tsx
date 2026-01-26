@@ -6,7 +6,7 @@ import axios from "axios";
 import { Button } from "@repo/ui/button";
 import { Card } from "@repo/ui/card";
 
-const HTTP_BACKEND = "http://localhost:3001";
+import { HTTP_BACKEND } from "@/config";
 
 export default function CreateRoomClient() {
   const [roomName, setRoomName] = useState("");
@@ -17,6 +17,11 @@ export default function CreateRoomClient() {
   const handleCreateRoom = async () => {
     if (!roomName.trim()) {
       setError("Room name is required");
+      return;
+    }
+
+    if (roomName.length < 3 || roomName.length > 20) {
+      setError("Room name must be between 3 and 20 characters");
       return;
     }
 
@@ -32,7 +37,11 @@ export default function CreateRoomClient() {
 
       router.push(`/canvas/${res.data.roomId}`);
     } catch (err: any) {
-      setError("Unauthorized or room already exists");
+      if (err.response?.status === 409) {
+          setError("Room with this name already exists");
+      } else {
+          setError("Failed to create room. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

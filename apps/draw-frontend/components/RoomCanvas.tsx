@@ -3,13 +3,19 @@ import { WS_URL } from "@/config";
 import { useEffect, useRef, useState } from "react";
 import { Canvass } from "./Canvas";
 
-export function RoomCanvas({roomId}: {roomId: string}) {
+export function RoomCanvas({ roomId, token }: { roomId: string, token: string }) {
     const [socket, setSocket] = useState<WebSocket | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         setError(null);
-        const ws = new WebSocket(`${WS_URL}?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4NjBiM2RjMC1iYTUzLTRmMjQtYTRiMC05Y2JhZTIwMzZhNTQiLCJpYXQiOjE3NjYzMTQ0MjJ9.zeqvViJFTP6n-DHjNNf-hF0ywSw9oP47sDLt41KDqIk`)
+
+        if (!token) {
+            setError("No token found");
+            return;
+        }
+
+        const ws = new WebSocket(`${WS_URL}?token=${token}`)
 
         ws.onopen = () => {
             console.info("WebSocket opened", WS_URL);
