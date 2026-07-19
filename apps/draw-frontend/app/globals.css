@@ -48,3 +48,8 @@
     --ring: 224.3 76.3% 48%;
   }
 }
+
+/* When canvas pages mount, add `hide-navbar` to body to hide the global header */
+body.hide-navbar header {
+  display: none !important;
+}

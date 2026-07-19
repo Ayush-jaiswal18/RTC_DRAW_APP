@@ -16,7 +16,7 @@ wss.on("error", (error: any) => {
 
 interface User {
   ws: WebSocket;
-  rooms: number[]; // 
+  rooms: number[];
   userId: string;
 }
 

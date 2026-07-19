@@ -4,7 +4,9 @@
   "description": "",
   "main": "dist/index.js",
   "exports": {
-    "./client": "./src/index.ts"
+    "./client": {
+      "import": "./dist/index.js"
+    }
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
