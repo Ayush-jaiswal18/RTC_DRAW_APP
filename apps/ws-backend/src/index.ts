@@ -57,24 +57,24 @@ wss.on("connection", (ws, request) => {
 
     if (parsedData.type === "join_room") {
       const user = users.find((u) => u.ws === ws);
-      const roomId = Number(parsedData.roomId); // ✅ FIX: convert to number
+      const roomId = Number(parsedData.roomId); 
       if (!user || isNaN(roomId)) return;
 
       if (!user.rooms.includes(roomId)) {
-        user.rooms.push(roomId); // ✅ FIX: consistent room type
+        user.rooms.push(roomId); 
       }
     }
 
     if (parsedData.type === "leave_room") {
       const user = users.find((u) => u.ws === ws);
-      const roomId = Number(parsedData.roomId); // ✅ FIX
+      const roomId = Number(parsedData.roomId); 
       if (!user || isNaN(roomId)) return;
 
-      user.rooms = user.rooms.filter((r) => r !== roomId); // ✅ FIX
+      user.rooms = user.rooms.filter((r) => r !== roomId); 
     }
 
     if (parsedData.type === "chat") {
-      const roomId = Number(parsedData.roomId); // ✅ FIX
+      const roomId = Number(parsedData.roomId); 
       const message = parsedData.message;
 
       if (isNaN(roomId) || typeof message !== "string") return;

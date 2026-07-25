@@ -76,8 +76,9 @@ app.post("/signin", async (req, res) => {
     // ✅ SET COOKIE (SSR SAFE)
     res.cookie("token", token, {
         httpOnly: true,
-        sameSite: "lax",
-        secure: false,
+        sameSite: "none",
+        secure: true,
+        path: "/",
     });
 
     res.json({ success: true });
@@ -117,6 +118,32 @@ app.post("/room", middleware, async (req, res) => {
         res.status(409).json({
             message: "Room already exists",
         });
+    }
+});
+
+app.get("/rooms", middleware, async (req, res) => {
+    // @ts-ignore
+    const userId = req.userId;
+
+    try {
+        const rooms = await prismaClient.room.findMany({
+            where: {
+                adminId: userId,
+            },
+            orderBy: {
+                createAt: "desc",
+            },
+            select: {
+                id: true,
+                slug: true,
+                createAt: true,
+            },
+        });
+
+        res.json({ rooms });
+    } catch (error) {
+        console.error("Failed to fetch user rooms", error);
+        res.status(500).json({ message: "Failed to fetch rooms" });
     }
 });
 
